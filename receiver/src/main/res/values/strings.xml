@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">POS Receiver</string>
+    <string name="service_desc">NFC Card Emulation Service</string>
+    <string name="aid_desc_visa">Visa Payment Cards</string>
+    <string name="aid_desc_mastercard">MasterCard Payment Cards</string>
+    <string name="aid_desc_amex">American Express Cards</string>
+    <string name="aid_desc_discover">Discover Cards</string>
+</resources>

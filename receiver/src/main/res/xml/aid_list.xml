@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<host-apdu-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:description="@string/service_desc"
+    android:requireDeviceUnlock="false">
+
+    <!-- Visa -->
+    <aid-group android:description="@string/aid_desc_visa" android:category="payment">
+        <aid android:value="A0000000031010" />
+    </aid-group>
+
+    <!-- MasterCard -->
+    <aid-group android:description="@string/aid_desc_mastercard" android:category="payment">
+        <aid android:value="A0000000041010" />
+        <aid android:value="A0000000042203" />
+    </aid-group>
+
+    <!-- American Express -->
+    <aid-group android:description="@string/aid_desc_amex" android:category="payment">
+        <aid android:value="A000000025010901" />
+    </aid-group>
+
+    <!-- Discover -->
+    <aid-group android:description="@string/aid_desc_discover" android:category="payment">
+        <aid android:value="A0000001524010" />
+    </aid-group>
+
+</host-apdu-service>
