@@ -2,52 +2,53 @@ package com.example.posbaby.receiver
 
 import android.content.Context
 import android.util.Log
+import java.io.BufferedReader
+import java.io.InputStreamReader
+
+data class SmartCardEntry(
+    val atr: String,
+    val description: String,
+    val aids: List<String>
+)
 
 object CardDatabase {
-
     private const val TAG = "CardDatabase"
-    private var parser: CardDatabaseParser? = null
-    private var isInitialized = false
+    private val entries = mutableListOf<SmartCardEntry>()
+    private var initialized = false
 
     fun initialize(context: Context) {
-        if (!isInitialized) {
-            parser = CardDatabaseParser(context)
-            isInitialized = true
-            Log.d(TAG, "CardDatabase initialized")
+        if (initialized) return
+        try {
+            context.assets.open("smart-card-list.txt").use { stream ->
+                BufferedReader(InputStreamReader(stream)).useLines { lines ->
+                    lines.filter { it.isNotBlank() && !it.startsWith("#") }
+                        .map { it.split("\\s+".toRegex(), 2) }
+                        .forEach { parts ->
+                            if (parts.size == 2) {
+                                val atr = parts[0]
+                                val desc = parts[1]
+                                val aids = when {
+                                    desc.contains("VISA", ignoreCase = true) ->
+                                        listOf("A0000000031010")
+                                    desc.contains("MASTER", ignoreCase = true) ->
+                                        listOf("A0000000041010")
+                                    desc.contains("AMEX", ignoreCase = true) ->
+                                        listOf("A000000025010901")
+                                    else ->
+                                        listOf("A0000000000000")
+                                }
+                                entries += SmartCardEntry(atr, desc, aids)
+                            }
+                        }
+                }
+            }
+            initialized = true
+            Log.d(TAG, "Loaded ${entries.size} ATR entries")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to load ATR database", e)
         }
     }
 
-    fun identifyCardByAtr(atr: ByteArray): CardDatabaseParser.CardInfo? {
-        val atrHex = atr.joinToString("") { "%02X".format(it) }
-        return parser?.findCardByAtr(atrHex)
-    }
-
-    fun identifyCardByAtr(atrHex: String): CardDatabaseParser.CardInfo? {
-        return parser?.findCardByAtr(atrHex)
-    }
-
-    fun getCardsByType(cardType: String): List<CardDatabaseParser.CardInfo> {
-        return parser?.findCardsByType(cardType) ?: emptyList()
-    }
-
-    fun getDatabaseStats(): Map<String, Int> {
-        return parser?.getDatabaseStats() ?: emptyMap()
-    }
-
-    // Legacy support for existing AID mappings
-    private val aidMappings = mapOf(
-        "A0000000031010" to "Visa",
-        "A0000000041010" to "MasterCard",
-        "A0000000042203" to "MasterCard Maestro",
-        "A000000025010901" to "American Express",
-        "A0000001524010" to "Discover"
-    )
-
-    fun getCardTypeByAid(aid: String): String? {
-        return aidMappings[aid.uppercase()]
-    }
-
-    fun getSupportedAids(): List<String> {
-        return aidMappings.keys.toList()
-    }
+    fun findByAtr(atr: String): SmartCardEntry? =
+        entries.find { it.atr.equals(atr, ignoreCase = true) }
 }

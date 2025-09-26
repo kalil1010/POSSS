@@ -5,7 +5,6 @@ import android.os.Bundle
 import android.util.Log
 import java.util.concurrent.BlockingQueue
 import java.util.concurrent.LinkedBlockingQueue
-import java.util.concurrent.TimeUnit
 
 class CardEmulationService : HostApduService() {
 
@@ -13,246 +12,127 @@ class CardEmulationService : HostApduService() {
         private const val TAG = "CardEmulationService"
         var currentCardData: CardRead? = null
 
-        // EMV Standard Response Codes
-        private val SUCCESS_RESPONSE = byteArrayOf(0x90.toByte(), 0x00.toByte())
+        private val SUCCESS = byteArrayOf(0x90.toByte(), 0x00.toByte())
         private val FILE_NOT_FOUND = byteArrayOf(0x6A.toByte(), 0x82.toByte())
-        private val WRONG_LENGTH = byteArrayOf(0x67.toByte(), 0x00.toByte())
-        private val COMMAND_NOT_SUPPORTED = byteArrayOf(0x6D.toByte(), 0x00.toByte())
-        private val CONDITIONS_NOT_SATISFIED = byteArrayOf(0x69.toByte(), 0x85.toByte())
+        private val CMD_NOT_SUPPORTED = byteArrayOf(0x6D.toByte(), 0x00.toByte())
+        private val COND_NOT_SAT = byteArrayOf(0x69.toByte(), 0x85.toByte())
 
-        // Common EMV Commands
-        private const val SELECT_COMMAND = "00A40400"
-        private const val GET_PROCESSING_OPTIONS = "80A80000"
-        private const val READ_RECORD = "00B2"
-        private const val GET_DATA = "80CA"
-
-        // Common AIDs
-        private val VISA_AID = "A0000000031010"
-        private val MASTERCARD_AID = "A0000000041010"
-        private val AMEX_AID = "A000000025010901"
-        private val DISCOVER_AID = "A0000001524010"
-
-        // Command and response queues for real-time processing
         val commandQueue: BlockingQueue<String> = LinkedBlockingQueue()
         val responseQueue: BlockingQueue<String> = LinkedBlockingQueue()
+
+        private const val PSE_AID = "325041592E5359532E4444463031"
     }
 
     override fun processCommandApdu(commandApdu: ByteArray?, extras: Bundle?): ByteArray {
         val apduHex = commandApdu?.joinToString("") { "%02X".format(it) } ?: "NULL"
-        Log.e(TAG, "🔥 INCOMING APDU: $apduHex")
-
-        // Add command to queue for monitoring
+        Log.d(TAG, "IN APDU: $apduHex")
         commandQueue.offer(apduHex)
 
-        // Log current card data
-        val cardInfo = currentCardData?.let {
-            "Card: ${it.holder_name} (${it.issuer_id}) PAN: ${it.pan.take(6)}****${it.pan.takeLast(4)}"
-        } ?: "No card data loaded"
-        Log.e(TAG, "🔥 $cardInfo")
-
-        return try {
+        val response = try {
             when {
-                isSelectCommand(apduHex) -> handleSelectCommand(apduHex)
-                isGetProcessingOptions(apduHex) -> handleGetProcessingOptions(apduHex)
-                isReadRecord(apduHex) -> handleReadRecord(apduHex)
-                isGetData(apduHex) -> handleGetData(apduHex)
-                else -> {
-                    Log.w(TAG, "🔥 Unknown command: $apduHex")
-                    COMMAND_NOT_SUPPORTED
-                }
+                apduHex.startsWith("00A40400") -> handleSelect(apduHex)
+                apduHex.startsWith("80A80000") -> handleGpo()
+                apduHex.startsWith("00B2") -> handleReadRecord(apduHex)
+                apduHex.startsWith("80CA") -> handleGetData(apduHex)
+                else -> CMD_NOT_SUPPORTED
             }
         } catch (e: Exception) {
-            Log.e(TAG, "🔥 Error processing APDU: ${e.message}")
-            COMMAND_NOT_SUPPORTED
-        }.also { response ->
-            val responseHex = response.joinToString("") { "%02X".format(it) }
-            Log.e(TAG, "🔥 RESPONSE: $responseHex")
-            responseQueue.offer(responseHex)
+            Log.e(TAG, "Error processing APDU", e)
+            CMD_NOT_SUPPORTED
         }
+
+        val respHex = response.joinToString("") { "%02X".format(it) }
+        Log.d(TAG, "OUT APDU: $respHex")
+        responseQueue.offer(respHex)
+        return response
     }
 
-    private fun isSelectCommand(apdu: String): Boolean {
-        return apdu.startsWith(SELECT_COMMAND)
-    }
+    private fun handleSelect(apdu: String): ByteArray {
+        val len = apdu.substring(10, 12).toInt(16) * 2
+        val aid = if (apdu.length >= 12 + len) apdu.substring(12, 12 + len) else ""
+        Log.d(TAG, "Select AID: $aid")
 
-    private fun isGetProcessingOptions(apdu: String): Boolean {
-        return apdu.startsWith(GET_PROCESSING_OPTIONS)
-    }
+        // PSE Directory handling
+        if (aid.equals(PSE_AID, ignoreCase = true)) {
+            Log.d(TAG, "PSE SELECT detected")
+            val dfNameHex = "315041592E5359532E4444463031"  // "1PAY.SYS.DDF01"
+            val fci = "6F0E$dfNameHex"
+            return hexStringToByteArray(fci) + SUCCESS
+        }
 
-    private fun isReadRecord(apdu: String): Boolean {
-        return apdu.startsWith(READ_RECORD)
-    }
+        // Application AIDs based on card type
+        val cardType = currentCardData?.getCardType()?.uppercase() ?: "UNKNOWN"
+        val isSupported = when {
+            aid.startsWith("A0000000031010") && cardType.contains("VISA") -> true
+            aid.startsWith("A0000000041010") && cardType.contains("MASTER") -> true
+            aid.startsWith("A000000025010901") && cardType.contains("AMEX") -> true
+            aid.startsWith("A0000001524010") && cardType.contains("DISCOVER") -> true
+            else -> false
+        }
 
-    private fun isGetData(apdu: String): Boolean {
-        return apdu.startsWith(GET_DATA)
-    }
-
-    private fun handleSelectCommand(apdu: String): ByteArray {
-        Log.d(TAG, "🔥 Processing SELECT command")
-
-        return if (currentCardData != null) {
-            // Extract AID from SELECT command
-            val aidLength = apdu.substring(10, 12).toInt(16) * 2
-            val aid = if (apdu.length >= 12 + aidLength) {
-                apdu.substring(12, 12 + aidLength)
-            } else ""
-
-            Log.d(TAG, "🔥 Selecting AID: $aid")
-
-            when {
-                aid.contains(VISA_AID) -> {
-                    Log.d(TAG, "🔥 VISA card selected")
-                    buildSelectResponse("VISA")
-                }
-                aid.contains(MASTERCARD_AID) -> {
-                    Log.d(TAG, "🔥 MasterCard selected")
-                    buildSelectResponse("MASTERCARD")
-                }
-                aid.contains(AMEX_AID) -> {
-                    Log.d(TAG, "🔥 American Express selected")
-                    buildSelectResponse("AMEX")
-                }
-                aid.contains(DISCOVER_AID) -> {
-                    Log.d(TAG, "🔥 Discover selected")
-                    buildSelectResponse("DISCOVER")
-                }
-                else -> {
-                    Log.w(TAG, "🔥 Unknown AID requested: $aid")
-                    FILE_NOT_FOUND
-                }
-            }
+        return if (isSupported) {
+            buildFci(aid) + SUCCESS
         } else {
-            Log.w(TAG, "🔥 No card data available for SELECT")
-            CONDITIONS_NOT_SATISFIED
-        }
-    }
-
-    private fun buildSelectResponse(cardType: String): ByteArray {
-        // Build FCI (File Control Information) template
-        val fciTemplate = when (cardType) {
-            "VISA" -> "6F1C840E315041592E5359532E4444463031A50A9F38009F4009000012345678"
-            "MASTERCARD" -> "6F1A840E325041592E5359532E4444463031A508BF0C0561034E03"
-            "AMEX" -> "6F19840E325041592E5359532E4444463031A507BF0C048201"
-            "DISCOVER" -> "6F1B840E325041592E5359532E4444463031A509BF0C06810200"
-            else -> "6F0C8407A0000000000000A501"
-        }
-
-        return hexStringToByteArray(fciTemplate) + SUCCESS_RESPONSE
-    }
-
-    private fun handleGetProcessingOptions(apdu: String): ByteArray {
-        Log.d(TAG, "🔥 Processing GET PROCESSING OPTIONS")
-
-        return if (currentCardData != null) {
-            // Build Application Interchange Profile (AIP) and Application File Locator (AFL)
-            val aip = "1800" // Terminal verification supported, SDA supported
-            val afl = "08010100" // Record 1 in file 1
-            val response = "77" + String.format("%02X", (aip.length + afl.length) / 2 + 4) +
-                    "82" + String.format("%02X", aip.length / 2) + aip +
-                    "94" + String.format("%02X", afl.length / 2) + afl
-
-            hexStringToByteArray(response) + SUCCESS_RESPONSE
-        } else {
-            CONDITIONS_NOT_SATISFIED
-        }
-    }
-
-    private fun handleReadRecord(apdu: String): ByteArray {
-        Log.d(TAG, "🔥 Processing READ RECORD")
-
-        return if (currentCardData != null) {
-            val card = currentCardData!!
-
-            // Build EMV record with card data
-            val pan = card.pan
-            val expiryDate = formatExpiryForEmv(card.expiry)
-            val cardholderName = card.holder_name.padEnd(26).take(26)
-
-            // EMV Record Template (simplified)
-            val record = buildEmvRecord(pan, expiryDate, cardholderName)
-
-            record + SUCCESS_RESPONSE
-        } else {
+            Log.w(TAG, "AID not supported: $aid")
             FILE_NOT_FOUND
         }
     }
 
+    private fun buildFci(aid: String): ByteArray {
+        val aidTag = "84" + "%02X".format(aid.length / 2) + aid
+        val name = currentCardData?.getCardType() ?: "CARD"
+        val labelHex = name.toByteArray().joinToString("") { "%02X".format(it) }
+        val labelTag = "50" + "%02X".format(labelHex.length / 2) + labelHex
+        val tpl = aidTag + labelTag
+        val fci = "6F" + "%02X".format(tpl.length / 2) + tpl
+        return hexStringToByteArray(fci)
+    }
+
+    private fun handleGpo(): ByteArray {
+        val aip = "5800"
+        val afl = "08010100"
+        val data = "82" + "%02X".format(aip.length / 2) + aip +
+                "94" + "%02X".format(afl.length / 2) + afl
+        val resp = "77" + "%02X".format(data.length / 2) + data
+        return hexStringToByteArray(resp) + SUCCESS
+    }
+
+    private fun handleReadRecord(apdu: String): ByteArray {
+        val card = currentCardData ?: return FILE_NOT_FOUND
+        val pan = card.pan
+        val exp = formatExpiry(card.expiry)
+        val nameHex = card.holder_name.toByteArray().joinToString("") { "%02X".format(it) }
+        val recordData = "5A" + "%02X".format(pan.length / 2) + pan +
+                "5F24" + "03" + exp +
+                "5F20" + "%02X".format(nameHex.length / 2) + nameHex
+        val tpl = "70" + "%02X".format(recordData.length / 2) + recordData
+        return hexStringToByteArray(tpl) + SUCCESS
+    }
+
     private fun handleGetData(apdu: String): ByteArray {
-        Log.d(TAG, "🔥 Processing GET DATA")
-
-        return if (currentCardData != null) {
-            // Extract data object tag from command
-            val tag = apdu.substring(6, 10)
-
-            when (tag.uppercase()) {
-                "9F13" -> { // Last Online ATC Register
-                    val atc = "0001"
-                    hexStringToByteArray("9F1302$atc") + SUCCESS_RESPONSE
-                }
-                "9F17" -> { // PIN Try Counter
-                    val ptc = "03"
-                    hexStringToByteArray("9F170103") + SUCCESS_RESPONSE
-                }
-                "9F36" -> { // Application Transaction Counter
-                    val counter = "0001"
-                    hexStringToByteArray("9F3602$counter") + SUCCESS_RESPONSE
-                }
-                else -> {
-                    Log.w(TAG, "🔥 Unknown GET DATA tag: $tag")
-                    FILE_NOT_FOUND
-                }
-            }
-        } else {
-            CONDITIONS_NOT_SATISFIED
+        val tag = apdu.substring(6, 10)
+        val data = when (tag.uppercase()) {
+            "9F36" -> "9F36020001"
+            else -> return FILE_NOT_FOUND
         }
+        return hexStringToByteArray(data) + SUCCESS
     }
 
-    private fun buildEmvRecord(pan: String, expiry: String, holderName: String): ByteArray {
-        // Build EMV record with TLV encoding
-        val panTag = "5A" + String.format("%02X", pan.length / 2) + pan
-        val expiryTag = "5F24" + "03" + expiry
-        val nameTag = "5F20" + String.format("%02X", holderName.length) + stringToHex(holderName)
-
-        val recordData = panTag + expiryTag + nameTag
-        val recordTemplate = "70" + String.format("%02X", recordData.length / 2) + recordData
-
-        return hexStringToByteArray(recordTemplate)
-    }
-
-    private fun formatExpiryForEmv(expiryString: String): String {
-        return try {
-            // Convert YYYY-MM-DD to YYMMDD
-            val parts = expiryString.split("-")
-            if (parts.size == 3) {
-                val year = parts[0].substring(2)
-                val month = parts[1]
-                val day = parts[2]
-                year + month + day
-            } else {
-                "250101" // Default fallback
-            }
-        } catch (e: Exception) {
-            "250101"
-        }
-    }
-
-    private fun stringToHex(str: String): String {
-        return str.toByteArray().joinToString("") { "%02X".format(it) }
+    private fun formatExpiry(exp: String): String = try {
+        val parts = exp.split("-")
+        parts[0].substring(2) + parts[1]
+    } catch (_: Exception) {
+        "2501"
     }
 
     private fun hexStringToByteArray(hex: String): ByteArray {
-        val cleanHex = hex.replace(" ", "")
-        return ByteArray(cleanHex.length / 2) { i ->
-            cleanHex.substring(i * 2, i * 2 + 2).toInt(16).toByte()
+        val clean = hex.replace(" ", "")
+        return ByteArray(clean.length / 2) { i ->
+            clean.substring(i * 2, i * 2 + 2).toInt(16).toByte()
         }
     }
 
     override fun onDeactivated(reason: Int) {
-        val reasonText = when (reason) {
-            DEACTIVATION_LINK_LOSS -> "Link Loss"
-            DEACTIVATION_DESELECTED -> "Deselected"
-            else -> "Unknown ($reason)"
-        }
-        Log.e(TAG, "🔥 Card emulation deactivated. Reason: $reasonText")
+        Log.d(TAG, "HCE Deactivated: $reason")
     }
 }

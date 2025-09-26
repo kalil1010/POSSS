@@ -1,5 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">POS Receiver</string>
-    <string name="service_desc">Emulates payment cards via NFC</string>
-    <string name="card_desc">Payment Card Emulation</string>
+    <string name="hce_service_name">Payment Card Emulator</string>
+    <string name="payment_aids">Payment Applications</string>
+    <string name="other_payment_aids">Transport &amp; Loyalty Applications</string>
 </resources>

@@ -1,157 +1,115 @@
 <?xml version="1.0" encoding="utf-8"?>
-<layout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools">
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:padding="16dp">
 
-    <androidx.constraintlayout.widget.ConstraintLayout
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:padding="16dp"
-        tools:context=".ReceiverActivity">
+    <LinearLayout
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="vertical">
 
-        <!-- Title -->
-        <TextView
-            android:id="@+id/tvTitle"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:text="POS Card Receiver"
-            android:textSize="24sp"
-            android:textStyle="bold"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="parent" />
-
-        <!-- Card Info Display -->
-        <TextView
-            android:id="@+id/tvCardInfo"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:text="No card received yet"
-            android:textAlignment="center"
-            android:background="@android:color/darker_gray"
-            android:padding="8dp"
-            android:textColor="@android:color/white"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/tvTitle" />
-
-        <!-- Cardholder name -->
-        <EditText
-            android:id="@+id/etReceiverName"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:hint="Cardholder Name"
-            android:inputType="textPersonName"
-            android:enabled="false"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/tvCardInfo" />
-
-        <!-- PAN -->
-        <EditText
-            android:id="@+id/etReceiverPan"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:hint="Card Number (PAN)"
-            android:inputType="number"
-            android:enabled="false"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/etReceiverName" />
-
-        <!-- Expiry -->
-        <EditText
-            android:id="@+id/etReceiverExpiry"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:hint="Expiry (MM/YY)"
-            android:inputType="text"
-            android:enabled="false"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/etReceiverPan" />
-
-        <!-- CVV -->
-        <EditText
-            android:id="@+id/etReceiverCvv"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:hint="CVV"
-            android:inputType="numberPassword"
-            android:enabled="false"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/etReceiverExpiry" />
-
-        <!-- Track Data -->
-        <EditText
-            android:id="@+id/etReceiverTrack"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:hint="Track Data"
-            android:inputType="text"
-            android:enabled="false"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/etReceiverCvv" />
-
-        <!-- Amount -->
-        <EditText
-            android:id="@+id/etReceiverAmount"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:hint="Amount"
-            android:inputType="numberDecimal"
-            android:enabled="false"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/etReceiverTrack" />
-
-        <!-- Receive Button -->
-        <Button
-            android:id="@+id/btnReceive"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="24dp"
-            android:text="Receive Card from Backend"
-            android:textSize="16sp"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/etReceiverAmount" />
-
-        <!-- NFC Settings Button -->
-        <Button
-            android:id="@+id/btnNfcSettings"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:text="Open NFC Payment Settings"
-            android:textSize="14sp"
-            android:backgroundTint="@android:color/holo_orange_light"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/btnReceive" />
-
-        <!-- Status -->
+        <!-- Status Header -->
         <TextView
             android:id="@+id/tvStatus"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:text="Ready to receive cards"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:text="🔄 Initializing NFC system..."
             android:textAlignment="center"
-            android:textColor="@android:color/darker_gray"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/btnNfcSettings" />
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:padding="8dp"
+            android:background="@android:drawable/dialog_holo_light_frame"
+            android:layout_marginBottom="12dp" />
 
-    </androidx.constraintlayout.widget.ConstraintLayout>
-</layout>
+        <!-- Action Buttons -->
+        <LinearLayout
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="horizontal" android:layout_marginBottom="12dp"
+            android:weightSum="3">
+
+            <Button
+                android:id="@+id/btnReceive"
+                android:layout_width="0dp" android:layout_height="wrap_content"
+                android:layout_weight="1" android:text="📥 Load Card" />
+
+            <Button
+                android:id="@+id/btnNfcSettings"
+                android:layout_width="0dp" android:layout_height="wrap_content"
+                android:layout_weight="1" android:text="⚙️ NFC Settings" />
+
+            <Button
+                android:id="@+id/btnMonitor"
+                android:layout_width="0dp" android:layout_height="wrap_content"
+                android:layout_weight="1" android:text="📊 Monitor APDU"
+                android:visibility="gone" />
+
+        </LinearLayout>
+
+        <!-- Card Information -->
+        <TextView
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:text="💳 Card Information"
+            android:textSize="16sp" android:textStyle="bold"
+            android:layout_marginBottom="8dp" />
+
+        <EditText
+            android:id="@+id/etReceiverName"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:enabled="false" android:hint="Cardholder Name"
+            android:layout_marginBottom="6dp" />
+
+        <EditText
+            android:id="@+id/etReceiverPan"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:enabled="false" android:hint="PAN (16 digits)"
+            android:layout_marginBottom="6dp" />
+
+        <EditText
+            android:id="@+id/etReceiverExpiry"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:enabled="false" android:hint="Expiry MM/YY"
+            android:layout_marginBottom="6dp" />
+
+        <EditText
+            android:id="@+id/etReceiverCvv"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:enabled="false" android:hint="CVV"
+            android:layout_marginBottom="6dp" />
+
+        <EditText
+            android:id="@+id/etReceiverTrack"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:enabled="false" android:hint="Track-2 Data"
+            android:layout_marginBottom="6dp" />
+
+        <EditText
+            android:id="@+id/etReceiverAmount"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:enabled="false" android:hint="Amount"
+            android:layout_marginBottom="12dp" />
+
+        <TextView
+            android:id="@+id/tvCardInfo"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:text="No card loaded"
+            android:padding="8dp"
+            android:background="@android:drawable/dialog_holo_light_frame"
+            android:layout_marginBottom="12dp" />
+
+        <!-- APDU Monitor -->
+        <ScrollView
+            android:id="@+id/scrollMonitor"
+            android:layout_width="match_parent" android:layout_height="200dp"
+            android:background="@android:color/black"
+            android:padding="8dp">
+
+            <TextView
+                android:id="@+id/tvMonitorLog"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="APDU monitor ready...\n"
+                android:textColor="@android:color/holo_green_light"
+                android:textSize="10sp"
+                android:fontFamily="monospace" />
+        </ScrollView>
+
+    </LinearLayout>
+</ScrollView>
