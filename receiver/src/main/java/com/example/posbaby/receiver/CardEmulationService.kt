@@ -19,8 +19,9 @@ class CardEmulationService : HostApduService() {
         val commandQueue: BlockingQueue<String> = LinkedBlockingQueue()
         val responseQueue: BlockingQueue<String> = LinkedBlockingQueue()
 
-        // Payment System Environment AID
-        private const val PSE_AID = "325041592E5359532E4444463031"
+        // Proximity PPSE and PSE AIDs
+        private const val PPSE_AID = "325041592E5359532E4444463032" // 2PAY.SYS.DDF02
+        private const val PSE_AID = "325041592E5359532E4444463031"  // 1PAY.SYS.DDF01
     }
 
     override fun processCommandApdu(commandApdu: ByteArray?, extras: Bundle?): ByteArray {
@@ -52,13 +53,16 @@ class CardEmulationService : HostApduService() {
         val aid = if (apdu.length >= 12 + len) apdu.substring(12, 12 + len) else ""
         Log.d(TAG, "📱 SELECT AID: $aid")
 
-        // Handle PSE directory SELECT
+        // Handle PPSE
+        if (aid.equals(PPSE_AID, ignoreCase = true)) {
+            Log.d(TAG, "✅ PPSE Request")
+            return buildFci(PPSE_AID)
+        }
+
+        // Handle PSE
         if (aid.equals(PSE_AID, ignoreCase = true)) {
-            Log.d(TAG, "✅ PSE Directory Request")
-            // Minimal valid FCI: 6F0E84 + DF name + 9000
-            val dfNameHex = "315041592E5359532E4444463031"
-            val fciHex = "6F0E84${dfNameHex}9000"
-            return hexStringToByteArray(fciHex)
+            Log.d(TAG, "✅ PSE Request")
+            return buildFci(PSE_AID)
         }
 
         // Application AID handling
@@ -78,6 +82,13 @@ class CardEmulationService : HostApduService() {
             Log.w(TAG, "❌ AID Not Supported: $aid")
             FILE_NOT_FOUND
         }
+    }
+
+    private fun buildFci(aid: String): ByteArray {
+        // 6F0E = FCI template with 14-byte length, 84 = DF name tag
+        val dfNameHex = aid
+        val fciHex = "6F0E84${dfNameHex}9000"
+        return hexStringToByteArray(fciHex)
     }
 
     private fun buildApplicationFci(aid: String): ByteArray {
@@ -105,7 +116,6 @@ class CardEmulationService : HostApduService() {
         val pan = card.pan
         val exp = formatExpiry(card.expiry)
         val nameHex = card.holder_name.toByteArray().joinToString("") { "%02X".format(it) }
-
         val recordDataHex =
             "5A" + "%02X".format(pan.length / 2) + pan +
                     "5F24" + "03" + exp +

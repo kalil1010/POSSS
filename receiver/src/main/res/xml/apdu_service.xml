@@ -6,25 +6,25 @@
     <aid-group android:category="payment"
         android:description="@string/payment_aids">
 
-        <!-- 1PAY.SYS.DDF01 (PSE) MUST BE FIRST -->
+        <!-- PPSE (Proximity PSE) -->
+        <aid-filter android:name="325041592E5359532E4444463032" />
+
+        <!-- PSE Directory -->
         <aid-filter android:name="325041592E5359532E4444463031" />
 
-        <!-- VISA -->
-        <aid-filter android:name="A0000000031010"/>
-        <!-- MasterCard -->
-        <aid-filter android:name="A0000000041010"/>
-        <!-- American Express -->
-        <aid-filter android:name="A000000025010901"/>
-        <!-- Discover -->
-        <aid-filter android:name="A0000001524010"/>
+        <!-- Major Payment Networks -->
+        <aid-filter android:name="A0000000031010" />   <!-- VISA -->
+        <aid-filter android:name="A0000000041010" />   <!-- MasterCard -->
+        <aid-filter android:name="A000000025010901" /> <!-- American Express -->
+        <aid-filter android:name="A0000001524010" />   <!-- Discover -->
 
         <!-- Extended AIDs -->
-        <aid-filter android:name="A0000000651010"/>
-        <aid-filter android:name="A000000333010101"/>
+        <aid-filter android:name="A0000000651010" />   <!-- JCB -->
+        <aid-filter android:name="A000000333010101" /> <!-- UnionPay -->
 
         <!-- Test AIDs -->
-        <aid-filter android:name="F222222222"/>
-        <aid-filter android:name="A0000000000001"/>
+        <aid-filter android:name="F222222222" />
+        <aid-filter android:name="A0000000000001" />
 
     </aid-group>
 
