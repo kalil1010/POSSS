@@ -55,8 +55,8 @@ class CardEmulationService : HostApduService() {
         // Handle PSE directory SELECT
         if (aid.equals(PSE_AID, ignoreCase = true)) {
             Log.d(TAG, "✅ PSE Directory Request")
-            // Minimal valid FCI: 6F0E = template + length, 84 + DF Name, then SW 9000
-            val dfNameHex = "315041592E5359532E4444463031"  // "1PAY.SYS.DDF01"
+            // Minimal valid FCI: 6F0E84 + DF name + 9000
+            val dfNameHex = "315041592E5359532E4444463031"
             val fciHex = "6F0E84${dfNameHex}9000"
             return hexStringToByteArray(fciHex)
         }
@@ -105,6 +105,7 @@ class CardEmulationService : HostApduService() {
         val pan = card.pan
         val exp = formatExpiry(card.expiry)
         val nameHex = card.holder_name.toByteArray().joinToString("") { "%02X".format(it) }
+
         val recordDataHex =
             "5A" + "%02X".format(pan.length / 2) + pan +
                     "5F24" + "03" + exp +

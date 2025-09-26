@@ -1,56 +1,38 @@
-<?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools">
+    package="com.example.posbaby.receiver">
 
-    <!-- NFC Permissions -->
-    <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.NFC" />
-
-    <!-- NFC Features -->
-    <uses-feature
-        android:name="android.hardware.nfc"
-        android:required="true" />
-    <uses-feature
-        android:name="android.hardware.nfc.hce"
-        android:required="true" />
 
     <application
         android:allowBackup="true"
+        android:label="@string/app_name"
         android:icon="@mipmap/ic_launcher"
-        android:label="POS Receiver"
         android:roundIcon="@mipmap/ic_launcher_round"
-        android:supportsRtl="true"
-        android:theme="@style/Theme.AppCompat.Light.DarkActionBar"
-        android:usesCleartextTraffic="true"
-        tools:targetApi="31">
+        android:theme="@style/AppTheme">
 
-        <!-- Receiver Activity -->
-        <activity
-            android:name=".ReceiverActivity"
-            android:exported="true"
-            android:launchMode="singleTop"
-            android:screenOrientation="portrait">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity>
-
-        <!-- Card Emulation Service -->
+        <!-- HCE Service -->
         <service
             android:name=".CardEmulationService"
             android:exported="true"
             android:permission="android.permission.BIND_NFC_SERVICE">
             <intent-filter>
-                <action android:name="android.nfc.cardemulation.action.HOST_APDU_SERVICE" />
+                <action android:name="android.nfc.cardemulation.action.HOST_APDU_SERVICE"/>
             </intent-filter>
-
             <meta-data
                 android:name="android.nfc.cardemulation.host_apdu_service"
-                android:resource="@xml/apdu_service" />
+                android:resource="@xml/apdu_service"/>
         </service>
 
-    </application>
+        <!-- Main Receiver Activity -->
+        <activity
+            android:name=".ReceiverActivity"
+            android:exported="true"
+            android:theme="@style/AppTheme">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity>
 
+    </application>
 </manifest>
