@@ -8,7 +8,6 @@
 
         <!-- PSE Directory (MUST BE FIRST) -->
         <aid-filter android:name="325041592E5359532E4444463031" />
-        <aid-filter android:name="325041592E5359532E4444463032" />
 
         <!-- Major Payment Networks -->
         <aid-filter android:name="A0000000031010" />
@@ -25,5 +24,4 @@
         <aid-filter android:name="A0000000000001" />
 
     </aid-group>
-
 </host-apdu-service>

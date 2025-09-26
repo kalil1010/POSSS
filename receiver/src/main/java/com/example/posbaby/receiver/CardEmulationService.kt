@@ -19,6 +19,7 @@ class CardEmulationService : HostApduService() {
         val commandQueue: BlockingQueue<String> = LinkedBlockingQueue()
         val responseQueue: BlockingQueue<String> = LinkedBlockingQueue()
 
+        // Payment System Environment AID
         private const val PSE_AID = "325041592E5359532E4444463031"
     }
 
@@ -51,18 +52,18 @@ class CardEmulationService : HostApduService() {
         val aid = if (apdu.length >= 12 + len) apdu.substring(12, 12 + len) else ""
         Log.d(TAG, "📱 SELECT AID: $aid")
 
-        // PSE Directory handling
+        // Handle PSE directory SELECT
         if (aid.equals(PSE_AID, ignoreCase = true)) {
             Log.d(TAG, "✅ PSE Directory Request")
-            val dfNameHex = "315041592E5359532E4444463031"
-            // '6F0E' = TLV tag & length for 14-byte DF name
-            val fciHex = "6F0E84${dfNameHex}A500"
-            return hexStringToByteArray(fciHex) + SUCCESS
+            // Minimal valid FCI: 6F0E = template + length, 84 + DF Name, then SW 9000
+            val dfNameHex = "315041592E5359532E4444463031"  // "1PAY.SYS.DDF01"
+            val fciHex = "6F0E84${dfNameHex}9000"
+            return hexStringToByteArray(fciHex)
         }
 
         // Application AID handling
         val cardType = currentCardData?.getCardType()?.uppercase() ?: return COND_NOT_SAT
-        val isSupported = when {
+        val supported = when {
             aid.startsWith("A0000000031010") && cardType.contains("VISA") -> true
             aid.startsWith("A0000000041010") && cardType.contains("MASTER") -> true
             aid.startsWith("A000000025010901") && cardType.contains("AMEX") -> true
@@ -70,7 +71,7 @@ class CardEmulationService : HostApduService() {
             else -> false
         }
 
-        return if (isSupported) {
+        return if (supported) {
             Log.d(TAG, "✅ AID Supported: $cardType")
             buildApplicationFci(aid) + SUCCESS
         } else {
@@ -104,10 +105,10 @@ class CardEmulationService : HostApduService() {
         val pan = card.pan
         val exp = formatExpiry(card.expiry)
         val nameHex = card.holder_name.toByteArray().joinToString("") { "%02X".format(it) }
-
-        val recordDataHex = "5A" + "%02X".format(pan.length / 2) + pan +
-                "5F24" + "03" + exp +
-                "5F20" + "%02X".format(nameHex.length / 2) + nameHex
+        val recordDataHex =
+            "5A" + "%02X".format(pan.length / 2) + pan +
+                    "5F24" + "03" + exp +
+                    "5F20" + "%02X".format(nameHex.length / 2) + nameHex
         val recordHex = "70" + "%02X".format(recordDataHex.length / 2) + recordDataHex
         return hexStringToByteArray(recordHex) + SUCCESS
     }
