@@ -2,53 +2,73 @@ package com.example.posbaby.receiver
 
 import android.content.Context
 import android.util.Log
-import java.io.BufferedReader
-import java.io.InputStreamReader
 
-data class SmartCardEntry(
+data class CardEntry(
     val atr: String,
-    val description: String,
+    val descriptions: List<String>,
     val aids: List<String>
 )
 
 object CardDatabase {
     private const val TAG = "CardDatabase"
-    private val entries = mutableListOf<SmartCardEntry>()
+    private val database = mutableMapOf<String, CardEntry>()
     private var initialized = false
 
     fun initialize(context: Context) {
         if (initialized) return
         try {
-            context.assets.open("smart-card-list.txt").use { stream ->
-                BufferedReader(InputStreamReader(stream)).useLines { lines ->
-                    lines.filter { it.isNotBlank() && !it.startsWith("#") }
-                        .map { it.split("\\s+".toRegex(), 2) }
-                        .forEach { parts ->
-                            if (parts.size == 2) {
-                                val atr = parts[0]
-                                val desc = parts[1]
-                                val aids = when {
-                                    desc.contains("VISA", ignoreCase = true) ->
-                                        listOf("A0000000031010")
-                                    desc.contains("MASTER", ignoreCase = true) ->
-                                        listOf("A0000000041010")
-                                    desc.contains("AMEX", ignoreCase = true) ->
-                                        listOf("A000000025010901")
-                                    else ->
-                                        listOf("A0000000000000")
-                                }
-                                entries += SmartCardEntry(atr, desc, aids)
-                            }
-                        }
-                }
+            context.assets.open("smart-card-list.txt").bufferedReader().use { reader ->
+                parseSmartCardList(reader.lineSequence())
             }
             initialized = true
-            Log.d(TAG, "Loaded ${entries.size} ATR entries")
+            Log.d(TAG, "Loaded ${database.size} ATR entries")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to load ATR database", e)
         }
     }
 
-    fun findByAtr(atr: String): SmartCardEntry? =
-        entries.find { it.atr.equals(atr, ignoreCase = true) }
+    private fun parseSmartCardList(lines: Sequence<String>) {
+        var currentAtr: String? = null
+        val descriptions = mutableListOf<String>()
+
+        lines.forEach { line ->
+            when {
+                line.startsWith("3B") -> {
+                    // Save previous entry
+                    currentAtr?.let { atr ->
+                        database[atr] = CardEntry(
+                            atr = atr,
+                            descriptions = descriptions.toList(),
+                            aids = extractAidsFromDescriptions(descriptions)
+                        )
+                    }
+                    // Start new entry
+                    currentAtr = line.trim()
+                    descriptions.clear()
+                }
+                line.startsWith("\t") && currentAtr != null -> {
+                    descriptions.add(line.trim())
+                }
+            }
+        }
+    }
+
+    private fun extractAidsFromDescriptions(descriptions: List<String>): List<String> {
+        val aids = mutableListOf<String>()
+        descriptions.forEach { desc ->
+            when {
+                desc.contains("VISA", ignoreCase = true) -> aids.add("A0000000031010")
+                desc.contains("MasterCard", ignoreCase = true) -> aids.add("A0000000041010")
+                desc.contains("AMEX", ignoreCase = true) -> aids.add("A000000025010901")
+                desc.contains("Discover", ignoreCase = true) -> aids.add("A0000001524010")
+            }
+        }
+        return aids.ifEmpty { listOf("A0000000031010") } // Default to VISA
+    }
+
+    fun findByAtr(atr: String): CardEntry? {
+        return database[atr] ?: database.entries.find { entry ->
+            atr.contains(entry.key, ignoreCase = true)
+        }?.value
+    }
 }

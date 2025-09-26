@@ -44,11 +44,16 @@ class ReceiverActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_receiver)
+
+        // Initialize CardDatabase with ATR lookup
+        CardDatabase.initialize(this)
+        Log.d(TAG, "✅ CardDatabase initialized")
+
         initViews()
         initNFC()
         initAPI()
         setupClicks()
-        Log.d(TAG, "Initialized")
+        Log.d(TAG, "🚀 ReceiverActivity initialized")
     }
 
     private fun initViews() {
@@ -65,17 +70,30 @@ class ReceiverActivity : AppCompatActivity() {
         etReceiverTrack = findViewById(R.id.etReceiverTrack)
         etReceiverAmount = findViewById(R.id.etReceiverAmount)
         tvCardInfo = findViewById(R.id.tvCardInfo)
+
         btnMonitor.visibility = View.GONE
+        appendLog("🔧 UI initialized")
     }
 
     private fun initNFC() {
         nfcAdapter = NfcAdapter.getDefaultAdapter(this)
-        tvStatus.text = when {
-            nfcAdapter == null -> "❌ NFC unavailable"
-            !nfcAdapter!!.isEnabled -> "⚠️ NFC disabled"
-            !packageManager.hasSystemFeature("android.hardware.nfc.hce") -> "❌ HCE unsupported"
-            else -> "✅ NFC ready"
+        val status = when {
+            nfcAdapter == null -> {
+                "❌ NFC unavailable on this device"
+            }
+            !nfcAdapter!!.isEnabled -> {
+                "⚠️ NFC disabled - Please enable in settings"
+            }
+            !packageManager.hasSystemFeature("android.hardware.nfc.hce") -> {
+                "❌ HCE (Host Card Emulation) not supported"
+            }
+            else -> {
+                "✅ NFC ready for card emulation"
+            }
         }
+
+        tvStatus.text = status
+        Log.d(TAG, status)
     }
 
     private fun initAPI() {
@@ -84,101 +102,191 @@ class ReceiverActivity : AppCompatActivity() {
             .addConverterFactory(GsonConverterFactory.create())
             .build()
         cardApi = retrofit.create(CardApi::class.java)
+        Log.d(TAG, "🌐 API client initialized: $BACKEND_URL")
     }
 
     private fun setupClicks() {
-        btnReceive.setOnClickListener { fetchCard() }
+        btnReceive.setOnClickListener {
+            appendLog("🔄 Loading card from backend...")
+            fetchCard()
+        }
+
         btnNfcSettings.setOnClickListener {
             startActivity(Intent(android.provider.Settings.ACTION_NFC_SETTINGS))
+            appendLog("⚙️ Opening NFC settings")
         }
-        btnMonitor.setOnClickListener { toggleMonitor() }
+
+        btnMonitor.setOnClickListener {
+            toggleMonitor()
+        }
     }
 
     private fun fetchCard() {
-        tvStatus.text = "🔄 Loading..."
+        tvStatus.text = "🔄 Loading card data from server..."
+
         cardApi.getCards().enqueue(object : Callback<List<CardRead>> {
             override fun onResponse(
                 call: Call<List<CardRead>>,
                 response: Response<List<CardRead>>
             ) {
-                val list = response.body().orEmpty()
-                if (list.isEmpty()) {
-                    toast("No cards")
+                val cardList = response.body().orEmpty()
+                if (cardList.isEmpty()) {
+                    toast("⚠️ No cards found on server")
+                    appendLog("❌ No cards available")
+                    tvStatus.text = "❌ No cards available"
                     return
                 }
-                val card = list.last()
+
+                // Get the latest card
+                val card = cardList.last()
                 currentCard = card
-                display(card)
-                enableEmu(card)
+
+                Log.d(TAG, "✅ Card loaded: ${card.holder_name} - ${card.getCardType()}")
+                appendLog("✅ Card loaded: ${card.holder_name} (${card.getCardType()})")
+
+                displayCard(card)
+                enableCardEmulation(card)
             }
 
             override fun onFailure(call: Call<List<CardRead>>, t: Throwable) {
-                toast("Error: ${t.message}")
+                val errorMsg = "Network error: ${t.message}"
+                toast(errorMsg)
+                appendLog("❌ $errorMsg")
+                tvStatus.text = "❌ Connection failed"
+                Log.e(TAG, "Failed to fetch cards", t)
             }
         })
     }
 
-    private fun display(card: CardRead) {
+    private fun displayCard(card: CardRead) {
+        // Display card information in UI
         etReceiverName.setText(card.holder_name)
         etReceiverPan.setText(formatPan(card.pan))
-        etReceiverExpiry.setText(formatExp(card.expiry))
-        etReceiverCvv.setText("***")
+        etReceiverExpiry.setText(formatExpiry(card.expiry))
+        etReceiverCvv.setText("***") // Don't show CVV
         etReceiverTrack.setText(card.track.ifEmpty { buildTrack2(card) })
-        etReceiverAmount.setText("%.2f".format(card.amount))
-        tvCardInfo.text = "ID:${card.id} | ${card.getCardType()}"
+        etReceiverAmount.setText("%.2f".format(card.amount ?: 0.0f))
+
+        // Display card info
+        val cardType = card.getCardType()
+        tvCardInfo.text = "💳 ID: ${card.id} | Type: $cardType | Ready for tap"
+
+        appendLog("📱 Card details displayed: $cardType")
     }
 
-    private fun enableEmu(card: CardRead) {
+    private fun enableCardEmulation(card: CardRead) {
+        // Set the card data for the emulation service
         CardEmulationService.currentCardData = card
-        tvStatus.text = "🎯 ${card.getCardType()} ready"
+
+        val cardType = card.getCardType()
+        tvStatus.text = "🎯 ${cardType} card ready for POS tap"
         btnMonitor.visibility = View.VISIBLE
+
+        appendLog("🎯 HCE enabled for $cardType card")
+        appendLog("📡 Ready to receive POS commands...")
+
+        Log.d(TAG, "Card emulation enabled: $cardType")
     }
 
     private fun toggleMonitor() {
         monitoringActive = !monitoringActive
+
         if (monitoringActive) {
-            executor.scheduleAtFixedRate({ pollQueues() }, 0, 100, TimeUnit.MILLISECONDS)
-            btnMonitor.text = "Stop Monitor"
+            btnMonitor.text = "⏹️ Stop Monitor"
+            appendLog("🔍 APDU monitoring started")
+
+            // Start polling APDU queues
+            executor.scheduleAtFixedRate({
+                pollApduQueues()
+            }, 0, 100, TimeUnit.MILLISECONDS)
+
         } else {
-            executor.shutdownNow()
             btnMonitor.text = "📊 Monitor APDU"
+            appendLog("⏸️ APDU monitoring stopped")
+
+            // Stop the executor
+            executor.shutdownNow()
         }
     }
 
-    private fun pollQueues() {
+    private fun pollApduQueues() {
+        // Poll command queue
         while (CardEmulationService.commandQueue.isNotEmpty()) {
-            val cmd = CardEmulationService.commandQueue.poll()
-            runOnUiThread { appendLog("CMD: $cmd") }
+            val command = CardEmulationService.commandQueue.poll()
+            runOnUiThread {
+                appendLog("🔵 CMD: $command")
+            }
         }
+
+        // Poll response queue
         while (CardEmulationService.responseQueue.isNotEmpty()) {
-            val rsp = CardEmulationService.responseQueue.poll()
-            runOnUiThread { appendLog("RSP: $rsp") }
+            val response = CardEmulationService.responseQueue.poll()
+            runOnUiThread {
+                appendLog("🟢 RSP: $response")
+            }
         }
     }
 
-    private fun appendLog(line: String) {
-        tvMonitorLog.append("$line\n")
-        scrollMonitor.post { scrollMonitor.fullScroll(View.FOCUS_DOWN) }
+    private fun appendLog(message: String) {
+        val timestamp = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date())
+        val logEntry = "[$timestamp] $message\n"
+
+        tvMonitorLog.append(logEntry)
+
+        // Auto-scroll to bottom
+        scrollMonitor.post {
+            scrollMonitor.fullScroll(View.FOCUS_DOWN)
+        }
+
+        Log.d(TAG, message)
     }
 
-    private fun formatPan(p: String) =
-        if (p.length >= 16) "${p.take(4)} **** **** ${p.takeLast(4)}" else p
+    private fun formatPan(pan: String): String {
+        return if (pan.length >= 16) {
+            "${pan.take(4)} **** **** ${pan.takeLast(4)}"
+        } else {
+            pan
+        }
+    }
 
-    private fun formatExp(e: String) = try {
-        SimpleDateFormat("MM/yy", Locale.US)
-            .format(SimpleDateFormat("yyyy-MM-dd", Locale.US).parse(e)!!)
-    } catch (_: Exception) {
-        e
+    private fun formatExpiry(expiry: String): String {
+        return try {
+            val inputFormat = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+            val outputFormat = SimpleDateFormat("MM/yy", Locale.US)
+            val date = inputFormat.parse(expiry)
+            outputFormat.format(date!!)
+        } catch (e: Exception) {
+            expiry // Return as-is if parsing fails
+        }
     }
 
     private fun buildTrack2(card: CardRead): String {
-        val parts = card.expiry.split("-")
-        val yy = parts[0].substring(2)
-        val mm = parts[1]
-        return "${card.pan}D${yy}${mm}$SERVICE_CODE"
+        return try {
+            val parts = card.expiry.split("-")
+            val yy = parts[0].substring(2)  // Get last 2 digits of year
+            val mm = parts[1]               // Get month
+            "${card.pan}D$yy$mm$SERVICE_CODE"
+        } catch (e: Exception) {
+            Log.e(TAG, "Error building Track 2", e)
+            "${card.pan}D2501$SERVICE_CODE" // Fallback
+        }
     }
 
-    private fun toast(s: String) {
-        Toast.makeText(this, s, Toast.LENGTH_SHORT).show()
+    private fun toast(message: String) {
+        Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        if (!executor.isShutdown) {
+            executor.shutdown()
+        }
+        Log.d(TAG, "🔴 ReceiverActivity destroyed")
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Check NFC status when returning to app
+        initNFC()
     }
 }
